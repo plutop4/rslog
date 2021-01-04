@@ -10,6 +10,39 @@ mod slowlog_reader;
 use slowlog_reader::SlowlogReader;
 use std::convert::TryFrom;
 
+struct Config {
+    hostname: String,
+    port: u16,
+    interval: u64,
+    verbosity: usize,
+    quiet: bool,
+}
+
+fn get_cli_args() -> Result<Config, clap::Error> {
+    let args = clap::App::from(clap::load_yaml!("cli.yaml"))
+        .version(clap::crate_version!())
+        .author(clap::crate_authors!())
+        .get_matches();
+    let config = Config {
+        hostname: args.value_of("hostname").unwrap().to_owned(),
+        port: args.value_of("port").unwrap().parse().map_err(|_| {
+            clap::Error::with_description(
+                "Port mast be a in range 0-65535".to_owned(),
+                clap::ErrorKind::ValueValidation,
+            )
+        })?,
+        interval: args.value_of("interval").unwrap().parse().map_err(|_| {
+            clap::Error::with_description(
+                "Interval must be an integer".to_owned(),
+                clap::ErrorKind::ValueValidation,
+            )
+        })?,
+        verbosity: args.occurrences_of("verbosity") as usize,
+        quiet: args.is_present("quiet"),
+    };
+    Ok(config)
+}
+
 fn print_rec(r: &SlowlogRecord) {
     println!(
         "[{}] id: {},\tduration: {},\tclient: {},\tclient_name: {},\tcommand: {:?}",
@@ -26,36 +59,27 @@ fn error_handler(e: redis::RedisError) {
     }
 }
 
-fn create_slowlog_reader(client: redis::Client) -> SlowlogReader {
+fn create_slowlog_reader(client: redis::Client, interval: u64) -> SlowlogReader {
     log::debug!("Creating slowlog reader");
     loop {
         match SlowlogReader::try_from(client.clone()) {
             Err(e) => error_handler(e),
             Ok(slr) => return slr,
         }
-        sleep(Duration::new(2, 0))
+        sleep(Duration::new(interval, 0))
     }
 }
 
 fn main() {
-    // Parse args
-    let args = clap::App::from(clap::load_yaml!("cli.yaml"))
-        .version(clap::crate_version!())
-        .author(clap::crate_authors!())
-        .get_matches();
-    let hostname = args.value_of("hostname").unwrap();
-    let port: u16 = args.value_of("port").unwrap().parse().unwrap();
-    let verbosity = args.occurrences_of("verbose") as usize;
-    let quiet = args.is_present("quiet");
-    // Init logger
+    let config = get_cli_args().map_err(|e| e.exit()).unwrap();
     stderrlog::new()
         .timestamp(stderrlog::Timestamp::Second)
-        .verbosity(verbosity)
-        .quiet(quiet)
+        .verbosity(config.verbosity)
+        .quiet(config.quiet)
         .init()
         .unwrap();
-    let redis_client = redis::Client::open((hostname, port)).unwrap();
-    let mut sl_reader = create_slowlog_reader(redis_client);
+    let redis_client = redis::Client::open((config.hostname, config.port)).unwrap();
+    let mut sl_reader = create_slowlog_reader(redis_client, config.interval);
 
     loop {
         match sl_reader
@@ -73,6 +97,6 @@ fn main() {
                 }
             }
         }
-        sleep(Duration::new(2, 0));
+        sleep(Duration::new(config.interval, 0));
     }
 }

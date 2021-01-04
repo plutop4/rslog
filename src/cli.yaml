@@ -11,7 +11,11 @@ args:
       short: p
       takes_value: true
       default_value: "6379"
-  - verbose:
+  - interval:
+      about: seconds between trying to get new messages from slowlog
+      short: i
+      default_value: "5"
+  - verbosity:
       about: Sets the level of verbosity
       short: v
       multiple: true
