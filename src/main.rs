@@ -7,41 +7,10 @@ use std::time::Duration;
 mod slowlog;
 use slowlog::SlowlogRecord;
 mod slowlog_reader;
+mod argument_parsing;
 use slowlog_reader::SlowlogReader;
 use std::convert::TryFrom;
 
-struct Config {
-    hostname: String,
-    port: u16,
-    interval: u64,
-    verbosity: usize,
-    quiet: bool,
-}
-
-fn get_cli_args() -> Result<Config, clap::Error> {
-    let args = clap::App::from(clap::load_yaml!("cli.yaml"))
-        .version(clap::crate_version!())
-        .author(clap::crate_authors!())
-        .get_matches();
-    let config = Config {
-        hostname: args.value_of("hostname").unwrap().to_owned(),
-        port: args.value_of("port").unwrap().parse().map_err(|_| {
-            clap::Error::with_description(
-                "Port mast be a in range 0-65535".to_owned(),
-                clap::ErrorKind::ValueValidation,
-            )
-        })?,
-        interval: args.value_of("interval").unwrap().parse().map_err(|_| {
-            clap::Error::with_description(
-                "Interval must be an integer".to_owned(),
-                clap::ErrorKind::ValueValidation,
-            )
-        })?,
-        verbosity: args.occurrences_of("verbosity") as usize,
-        quiet: args.is_present("quiet"),
-    };
-    Ok(config)
-}
 
 fn print_rec(r: &SlowlogRecord) {
     println!(
@@ -71,7 +40,7 @@ fn create_slowlog_reader(client: redis::Client, interval: u64) -> SlowlogReader 
 }
 
 fn main() {
-    let config = get_cli_args().map_err(|e| e.exit()).unwrap();
+    let config = argument_parsing::get_config().map_err(|e| e.exit()).unwrap();
     stderrlog::new()
         .timestamp(stderrlog::Timestamp::Second)
         .verbosity(config.verbosity)
