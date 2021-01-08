@@ -3,6 +3,7 @@ use clap::{App, Arg};
 pub struct Config {
     pub hostname: String,
     pub port: u16,
+    pub follow: bool,
     pub interval: u64,
     pub verbosity: usize,
     pub quiet: bool,
@@ -33,6 +34,10 @@ pub fn get_config() -> Result<Config, clap::Error> {
                         Ok(())
                     }
                 }),
+        )
+        .arg(
+            Arg::from("-f --follow 'checks for new records in slowlog and prints if any'")
+                .takes_value(false),
         )
         .arg(
             Arg::new("interval")
@@ -66,6 +71,7 @@ pub fn get_config() -> Result<Config, clap::Error> {
         hostname: args.value_of("hostname").unwrap().to_owned(),
         port: args.value_of("port").unwrap().parse().unwrap(),
         interval: args.value_of("interval").unwrap().parse().unwrap(),
+        follow: args.is_present("follow") || args.occurrences_of("interval") > 0,
         verbosity: args.occurrences_of("verbosity") as usize,
         quiet: args.is_present("quiet"),
     };

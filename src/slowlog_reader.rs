@@ -22,7 +22,10 @@ impl std::convert::TryFrom<redis::Client> for SlowlogReader {
     }
 }
 
-fn get_slowlog(con: &mut redis::Connection, length: u32) -> redis::RedisResult<Vec<SlowlogRecord>> {
+pub fn get_slowlog(
+    con: &mut redis::Connection,
+    length: u32,
+) -> redis::RedisResult<Vec<SlowlogRecord>> {
     log::debug!("Executing slowlog query");
     redis::cmd("SLOWLOG").arg("GET").arg(length).query(con)
 }
