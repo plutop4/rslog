@@ -9,48 +9,39 @@ pub struct Config {
     pub quiet: bool,
 }
 
+macro_rules! is_parsable {
+    ($t: ty, $s: literal) => {
+        |value| match value.parse::<$t>() {
+            Err(_) => Err($s),
+            Ok(_) => Ok(()),
+        }
+    };
+}
+
 pub fn get_config() -> Result<Config, clap::Error> {
     let args = App::new("Redis slowlog reader")
         .about("Prints redis slowlog to stdout")
         .version(clap::crate_version!())
         .author(clap::crate_authors!())
         .arg(
-            Arg::new("hostname")
-                .about("Server hostname")
-                .short('h')
+            Arg::from("--hostname -h 'Server hostname'")
                 .takes_value(true)
                 .default_value("127.0.0.1"),
         )
         .arg(
-            Arg::new("port")
-                .about("Server port")
-                .short('p')
+            Arg::from("--port -p 'Server port'")
                 .takes_value(true)
                 .default_value("6379")
-                .validator(|port| {
-                    if port.parse::<u16>().is_err() {
-                        Err("Port mast be a in range 0-65535")
-                    } else {
-                        Ok(())
-                    }
-                }),
+                .validator(is_parsable!(u16, "Port mast be a in range 0-65535")),
         )
         .arg(
-            Arg::from("-f --follow 'checks for new records in slowlog and prints if any'")
+            Arg::from("-f --follow 'Checks for new records in slowlog and prints if any'")
                 .takes_value(false),
         )
         .arg(
-            Arg::new("interval")
-                .about("seconds between trying to get new messages from slowlog")
-                .short('i')
+            Arg::from("--interval -i 'Seconds between trying to get new messages from slowlog'")
                 .default_value("5")
-                .validator(|interval| {
-                    if interval.parse::<u64>().is_err() {
-                        Err("Interval must be an integer")
-                    } else {
-                        Ok(())
-                    }
-                }),
+                .validator(is_parsable!(u64, "Interval must be an integer")),
         )
         .arg(
             Arg::new("verbosity")
@@ -59,11 +50,11 @@ pub fn get_config() -> Result<Config, clap::Error> {
                 .multiple(true)
                 .takes_value(false),
         )
+        .arg(Arg::from("--quiet -q 'Silence all error messages'").takes_value(false))
         .arg(
-            Arg::new("quiet")
-                .about("Silence all error messages")
-                .short('q')
-                .takes_value(false),
+            Arg::from("--timeout 'Timout for redis connection'")
+                .takes_value(true)
+                .validator(is_parsable!(u64, "hello there")),
         )
         .get_matches();
 
