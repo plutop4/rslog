@@ -1,4 +1,7 @@
-#[derive(Debug, Default, PartialEq)]
+
+use serde::Serialize;
+
+#[derive(Debug, Default, PartialEq, Serialize)]
 pub struct SlowlogRecord {
     pub id: u64,
     pub time: u64,

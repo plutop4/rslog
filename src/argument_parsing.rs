@@ -1,5 +1,10 @@
 use clap::{App, Arg};
 
+pub enum OutputFormat {
+    Text,
+    Json,
+}
+
 pub struct Config {
     pub hostname: String,
     pub port: u16,
@@ -8,6 +13,7 @@ pub struct Config {
     pub verbosity: usize,
     pub quiet: bool,
     pub timeout: u64,
+    pub output_format: OutputFormat,
 }
 
 macro_rules! is_parsable {
@@ -58,6 +64,7 @@ pub fn get_config() -> Result<Config, clap::Error> {
                 .validator(is_parsable!(u64, "Timeout must be a positive integer"))
                 .default_value("30"),
         )
+        .arg(Arg::from("--json 'Format output as newline separated JSON'").takes_value(false))
         .get_matches();
 
     let config = Config {
@@ -68,6 +75,7 @@ pub fn get_config() -> Result<Config, clap::Error> {
         verbosity: args.occurrences_of("verbosity") as usize,
         quiet: args.is_present("quiet"),
         timeout: args.value_of("timeout").unwrap().parse().unwrap(),
+        output_format: if args.is_present("json") {OutputFormat::Json} else {OutputFormat::Text},
     };
     Ok(config)
 }
