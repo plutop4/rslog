@@ -59,7 +59,15 @@ fn get_uptime(con: &mut redis::Connection) -> redis::RedisResult<u64> {
 impl SlowlogReader {
     pub fn get(&mut self) -> redis::RedisResult<Vec<SlowlogRecord>> {
         self.check_for_restart()?;
-        let new_records: Vec<_> = get_slowlog(&mut self.connection, self.length)?
+        let sl: Vec<_> = get_slowlog(&mut self.connection, self.length)?;
+        // records in vec are in reverse order
+        if let Some(first_record) = sl.last() {
+            let missing_records = first_record.id as i64 - 1 - self.last_id;
+            if self.last_id > 0 && missing_records > 0 {
+                log::warn!("{} records skiped", missing_records)
+            };
+        };
+        let new_records: Vec<_> = sl
             .into_iter()
             .filter(|r| r.id as i64 > self.last_id)
             .collect();
@@ -74,7 +82,8 @@ impl SlowlogReader {
     fn check_for_restart(&mut self) -> redis::RedisResult<()> {
         let uptime = get_uptime(&mut self.connection)?;
         if uptime < self.uptime {
-            self.last_id = -1
+            self.last_id = -1;
+            log::info!("Redis server restart detected")
         }
         self.uptime = uptime;
         Ok(())
