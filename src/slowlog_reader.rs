@@ -1,19 +1,20 @@
 use crate::slowlog::SlowlogRecord;
+use crate::ConnectionProvider;
 
 pub struct SlowlogReader {
-    client: redis::Client,
-    con: redis::Connection,
+    connection_provider: ConnectionProvider,
+    connection: redis::Connection,
     last_id: i64,
     length: u32,
     uptime: u64,
 }
 
-impl std::convert::TryFrom<redis::Client> for SlowlogReader {
+impl std::convert::TryFrom<ConnectionProvider> for SlowlogReader {
     type Error = redis::RedisError;
-    fn try_from(client: redis::Client) -> Result<Self, Self::Error> {
+    fn try_from(connection_provider: ConnectionProvider) -> Result<Self, Self::Error> {
         let sl_reader = SlowlogReader {
-            con: client.get_connection()?,
-            client: client,
+            connection: connection_provider.get_connection()?,
+            connection_provider,
             last_id: -1,
             length: 128,
             uptime: 0,
@@ -34,8 +35,7 @@ fn get_uptime(con: &mut redis::Connection) -> redis::RedisResult<u64> {
     let server_info = redis::cmd("INFO").arg("SERVER").query::<String>(con)?;
     server_info
         .lines()
-        .filter(|l| l.contains("uptime_in_seconds"))
-        .nth(0)
+        .find(|l| l.contains("uptime_in_seconds"))
         .ok_or((
             redis::ErrorKind::TypeError,
             "No uptime line in response from server",
@@ -59,7 +59,7 @@ fn get_uptime(con: &mut redis::Connection) -> redis::RedisResult<u64> {
 impl SlowlogReader {
     pub fn get(&mut self) -> redis::RedisResult<Vec<SlowlogRecord>> {
         self.check_for_restart()?;
-        let new_records: Vec<_> = get_slowlog(&mut self.con, self.length)?
+        let new_records: Vec<_> = get_slowlog(&mut self.connection, self.length)?
             .into_iter()
             .filter(|r| r.id as i64 > self.last_id)
             .collect();
@@ -67,12 +67,12 @@ impl SlowlogReader {
         Ok(new_records)
     }
     pub fn update_connection(&mut self) -> Result<(), redis::RedisError> {
-        self.con = self.client.get_connection()?;
+        self.connection = self.connection_provider.get_connection()?;
         Ok(())
     }
 
     fn check_for_restart(&mut self) -> redis::RedisResult<()> {
-        let uptime = get_uptime(&mut self.con)?;
+        let uptime = get_uptime(&mut self.connection)?;
         if uptime < self.uptime {
             self.last_id = -1
         }

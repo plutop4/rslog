@@ -7,6 +7,7 @@ pub struct Config {
     pub interval: u64,
     pub verbosity: usize,
     pub quiet: bool,
+    pub timeout: u64,
 }
 
 macro_rules! is_parsable {
@@ -54,7 +55,8 @@ pub fn get_config() -> Result<Config, clap::Error> {
         .arg(
             Arg::from("--timeout 'Timout for redis connection'")
                 .takes_value(true)
-                .validator(is_parsable!(u64, "hello there")),
+                .validator(is_parsable!(u64, "Timeout must be a positive integer"))
+                .default_value("30"),
         )
         .get_matches();
 
@@ -65,6 +67,7 @@ pub fn get_config() -> Result<Config, clap::Error> {
         follow: args.is_present("follow") || args.occurrences_of("interval") > 0,
         verbosity: args.occurrences_of("verbosity") as usize,
         quiet: args.is_present("quiet"),
+        timeout: args.value_of("timeout").unwrap().parse().unwrap(),
     };
     Ok(config)
 }
