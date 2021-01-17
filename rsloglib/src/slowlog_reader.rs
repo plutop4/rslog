@@ -1,17 +1,39 @@
 use crate::slowlog::SlowlogRecord;
-use crate::ConnectionProvider;
+use std::time::Duration;
+
+#[derive(Clone)]
+pub struct RedisConnectionProvider {
+    client: redis::Client,
+    timeout: u64,
+}
+
+impl From<(redis::Client, u64)> for RedisConnectionProvider {
+    fn from(arg: (redis::Client, u64)) -> RedisConnectionProvider {
+        RedisConnectionProvider {
+            client: arg.0,
+            timeout: arg.1,
+        }
+    }
+}
+
+impl RedisConnectionProvider {
+    pub fn get_connection(&self) -> redis::RedisResult<redis::Connection> {
+        self.client
+            .get_connection_with_timeout(Duration::from_secs(self.timeout))
+    }
+}
 
 pub struct SlowlogReader {
-    connection_provider: ConnectionProvider,
+    connection_provider: RedisConnectionProvider,
     connection: redis::Connection,
     last_id: i64,
     length: u32,
     uptime: u64,
 }
 
-impl std::convert::TryFrom<ConnectionProvider> for SlowlogReader {
+impl std::convert::TryFrom<RedisConnectionProvider> for SlowlogReader {
     type Error = redis::RedisError;
-    fn try_from(connection_provider: ConnectionProvider) -> Result<Self, Self::Error> {
+    fn try_from(connection_provider: RedisConnectionProvider) -> Result<Self, Self::Error> {
         let sl_reader = SlowlogReader {
             connection: connection_provider.get_connection()?,
             connection_provider,
