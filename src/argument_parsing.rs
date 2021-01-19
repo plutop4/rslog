@@ -8,6 +8,7 @@ pub enum OutputFormat {
 pub struct Config {
     pub hostname: String,
     pub port: u16,
+    pub password: Option<String>,
     pub follow: bool,
     pub interval: u64,
     pub verbosity: usize,
@@ -42,6 +43,11 @@ pub fn get_config() -> Result<Config, clap::Error> {
                 .validator(is_parsable!(u16, "Port mast be a in range 0-65535")),
         )
         .arg(
+            Arg::from("-a --password 'Password to use when connecting to the server'")
+                .takes_value(true)
+                .required(false),
+        )
+        .arg(
             Arg::from("-f --follow 'Checks for new records in slowlog and prints if any'")
                 .takes_value(false),
         )
@@ -70,12 +76,17 @@ pub fn get_config() -> Result<Config, clap::Error> {
     let config = Config {
         hostname: args.value_of("hostname").unwrap().to_owned(),
         port: args.value_of("port").unwrap().parse().unwrap(),
+        password: args.value_of("password").map(|p| p.to_owned()),
         interval: args.value_of("interval").unwrap().parse().unwrap(),
         follow: args.is_present("follow") || args.occurrences_of("interval") > 0,
         verbosity: args.occurrences_of("verbosity") as usize,
         quiet: args.is_present("quiet"),
         timeout: args.value_of("timeout").unwrap().parse().unwrap(),
-        output_format: if args.is_present("json") {OutputFormat::Json} else {OutputFormat::Text},
+        output_format: if args.is_present("json") {
+            OutputFormat::Json
+        } else {
+            OutputFormat::Text
+        },
     };
     Ok(config)
 }

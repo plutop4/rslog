@@ -1,12 +1,11 @@
+use std::convert::TryFrom;
 use std::thread::sleep;
 use std::time::Duration;
-use std::convert::TryFrom;
 
 mod argument_parsing;
 use argument_parsing::OutputFormat;
 
-use rsloglib::{SlowlogRecord,SlowlogReader, RedisConnectionProvider};
-
+use rsloglib::{RedisConnectionProvider, SlowlogReader, SlowlogRecord};
 
 fn print_rec(r: &SlowlogRecord, format: &OutputFormat) {
     match format {
@@ -26,6 +25,14 @@ fn error_handler(e: redis::RedisError) {
     match e.kind() {
         redis::ErrorKind::IoError => {
             log::error!("Can't establish connection to redis cluster: {}", e)
+        }
+        redis::ErrorKind::AuthenticationFailed => {
+            log::error!("{:?}: {}", e.kind(), e);
+            std::process::exit(1);
+        }
+        redis::ErrorKind::ExtensionError => {
+            log::error!("{:?}: {}", e.kind(), e);
+            std::process::exit(1);
         }
         _ => unimplemented!("Error not handled: {}({:?})", e, e.kind()),
     }
@@ -89,7 +96,16 @@ pub fn main() {
         .quiet(config.quiet)
         .init()
         .unwrap();
-    let redis_client = redis::Client::open((&config.hostname, config.port)).unwrap();
+    let redis_client = redis::Client::open(redis::ConnectionInfo {
+        addr: Box::new(redis::ConnectionAddr::Tcp(
+            config.hostname.clone(),
+            config.port,
+        )),
+        db: 0,
+        username: None,
+        passwd: config.password.clone(),
+    })
+    .unwrap();
     let connection_provider = RedisConnectionProvider::from((redis_client, config.interval));
     if config.follow {
         read_continiously(connection_provider, &config)
